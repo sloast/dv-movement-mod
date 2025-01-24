@@ -1,0 +1,10 @@
+{
+	"Id": "movement_mod",
+	"Version": "1.0.0",
+	"DisplayName": "Movement Mod",
+	"Author": "sloast",
+	"EntryMethod": "movement_mod.Main.Load",
+	"ManagerVersion": "0.27.3",
+	"Repository": "https://raw.githubusercontent.com/sloast/dv-movement-mod/main/repository.json",
+	"HomePage": "https://github.com/sloast/dv-movement-mod"
+}
