@@ -1,32 +1,36 @@
-Gravity Gun
-===========
+Movement Mod
+============
 
-Lets you push train cars around, pick them up, and fling them many miles away :)
-
-Based on [template-umm](https://github.com/derail-valley-modding/template-umm)
+Changes the player movement mechanics, making it more like that of the Source engine.
 
 Installing
 ----------
 
 Go to the releases tab on the right, download the latest release, and install it with [UMM](https://www.nexusmods.com/site/mods/21).
 
-Usage
------
+Mechanics
+---------
 
-- Open the radio and go to "Gravity Gun"
-- Click on a car to pick it up
-- Click to release it
-- The car follows the laser pointer of the radio
-- Scroll to move the car closer or further
-- Hold `Ctrl` and scroll to change the force of the gun
-- Middle click to fling the car
+The mod adds airstrafing and bunnyhopping, much like in Source. It also changes the ground movement to have more of a sense of weight, with customisable run speed and acceleration. In addition, your momentum is now preserved when jumping on or onto a moving train.
+
+There is a setting to make the air movement more like HL2 and Portal, which limits bunnyhopping speed, but the ABH/AFH glitch has been replicated (Portal was used as a reference, I haven't played HL2).
+
+Vertical movement and swimming are unaffected in the current version.
 
 Settings
 --------
 
-Has settings for base force, damping, etc.
-"Min offset to derail" changes how hard you need to pull a car upwards for it to derail.
-"Grab at CoM" changes the behaviour of the gun to always pick up cars from their centre of mass (i.e. applies no torque to the car). Enabling this makes it a lot easier to fly by standing ontop of a car and grabbing.
+| Setting | Description | Default |
+|--------|-------------|---------|
+| Auto bunnyhopping | Automatically jump if space is held | `true` |
+| sv_airaccelerate | Air acceleration | `100` |
+| max_wishspeed | `max_wishspd` parameter (leave this alone if you don't know what it does) | `1` |
+| ABH | Enable ABH/AFH (limits bunnyhopping speed to run speed) | `true` |
+| Max ABH speed | Cap on ABH speed to prevent clipping out of the map | `250` |
+| Mod ground movement | Enable the custom ground movement | `true` |
+| Run speed | Max running speed (also applies in the air) | `6` |
+| Walk speed | Max walking speed | `2` |
+| Ground accelerate | Acceleration when on the ground | `20` |
 
 Issues
 ------
