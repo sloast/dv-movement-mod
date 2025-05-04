@@ -73,17 +73,19 @@ public static class Main
 
 public class Settings : ModSettings, IDrawable
 {
-	[Draw("Auto Bunnyhopping")] public bool autoBhop = false;
-	[Draw("sv_airaccelerate")] public float sv_accelerate = 5f;
-	[Draw("run speed")] public float runSpeed = 6f;
+	[Draw("Auto bunnyhopping")] public bool autoBhop = true;
+	[Draw("sv_airaccelerate")] public float sv_accelerate = 100f;
 	[Draw("max_wishspd")] public float maxWishspd = 1f;
-	[Draw("movement speed multiplier")] public float speedmult = 1f;
+
+	[Space]
 	[Draw("ABH (portal/hl2)")] public bool abh = false;
 	[Draw("Max ABH spd")] public float maxAbhSpeed = 250f;
+
+	[Space]
 	[Draw("Mod ground movement")] public bool walk = true;
-	[Draw("Ground accelerate")] public float ground_accelerate = 10f;
-	[Draw("Ground decelerate")] public float ground_decelerate = 5f;
-	[Draw("Static accel factor")] public float static_accel = 1f;
+	[Draw("Run speed")] public float runSpeed = 6f;
+	[Draw("Walk speed")] public float walkSpeed = 2f;
+	[Draw("Ground accelerate")] public float ground_accelerate = 20f;
 
 	[Space]
 	[Draw("Reset")] public bool reset = false;
@@ -97,17 +99,17 @@ public class Settings : ModSettings, IDrawable
 	{
 		if (reset)
 		{
-			autoBhop = false;
-			sv_accelerate = 5f;
-			runSpeed = 6f;
+			autoBhop = true;
+			sv_accelerate = 100f;
 			maxWishspd = 1f;
-			speedmult = 1f;
+
 			abh = false;
 			maxAbhSpeed = 250f;
+
 			walk = true;
-			ground_accelerate = 10f;
-			ground_decelerate = 5f;
-			static_accel = 1f;
+			runSpeed = 6f;
+			walkSpeed = 2f;
+			ground_accelerate = 20f;
 
 			reset = false;
 		}
@@ -174,77 +176,113 @@ static class CustomFirstPersonController_Patch
 		__result = false;
 	}
 
-	[HarmonyPatch("CharacterMovement"), HarmonyPostfix]
-	public static void CharacterMovement_Postfix(CustomFirstPersonController __instance, Vector3 ___desiredMove, Vector3 ___m_MoveDir)
+	[HarmonyPatch(nameof(CustomFirstPersonController.RequestFootstepSound)), HarmonyPatch([typeof(FootstepsAudioScriptableObject.MovementType)]), HarmonyPrefix]
+	public static void RequestFootstepSound_Prefix(CustomFirstPersonController __instance, FootstepsAudioScriptableObject.MovementType moveType)
 	{
+		if (moveType == FootstepsAudioScriptableObject.MovementType.Landing)
+		{
+			__instance.prevFrameLandingVelocity.x = 0;
+			__instance.prevFrameLandingVelocity.z = 0;
+		}
+	}
+
+	[HarmonyPatch("CharacterMovement"), HarmonyPrefix]
+	public static void CharacterMovement_Prefix(CustomFirstPersonController __instance, LocomotionInputWrapper ___playerInput)
+	{
+
 		if (__instance.isRepositioning)
 		{
 			velocity = Vector3.zero;
 			return;
 		}
 
-		if (!__instance.capsule.enabled)
-		{
-			__instance.capsule.enabled = true;
-			___m_MoveDir = Vector3.zero;
-		}
-		else if (!reparented)
+		else if (__instance.capsule.enabled && !reparented)
 		{
 			velocity = __instance.capsule.velocity;
 		}
 
 		if (reparented) reparented = false;
 
+	}
+
+	[HarmonyPatch("CharacterMovement"), HarmonyPostfix]
+	public static void CharacterMovement_Postfix(
+		CustomFirstPersonController __instance,
+		Vector3 ___m_MoveDir,
+		float ___m_StickToGroundForce,
+		bool ___m_IsWalking,
+		Vector3 ___desiredMove
+	) {
+		if (!__instance.capsule.enabled)
+		{
+			if (velocity.sqrMagnitude < float.Epsilon) return;
+			__instance.capsule.enabled = true;
+			___m_MoveDir = Vector3.zero;
+		}
+
 		horizontalVelocity = velocity.xz();
 
-		float runSpeed = Main.settings.runSpeed;
+		bool jumping = __instance.m_Jumping || !previouslyGrounded;
+
+		bool updateVel = true;
+		float speed = (___m_IsWalking && !jumping) ? Main.settings.walkSpeed : Main.settings.runSpeed;
 
 		if (__instance.IsCrouching)
-			runSpeed *= 0.5f;
+			speed *= 0.5f;
 
-		if (__instance.m_Jumping || !previouslyGrounded)
+		Vector2 wishVeloc = ___desiredMove.xz() * speed;
+
+		if (jumping)
 		{
 			if (previouslyGrounded && !__instance.IsCrouching && !previouslypreviouslyGrounded)
 			{
 				__instance.SetCapsuleHeight(1.1f);
 			}
 
-			Vector2 wishVeloc = ___m_MoveDir.xz();
-
 			SvUser.SV_AirAccelerate(wishVeloc, ref horizontalVelocity);
 
 			if (Main.settings.abh && previouslyGrounded)
 			{
-				if (horizontalVelocity.magnitude > runSpeed)
+				if (horizontalVelocity.magnitude > speed)
 				{
-					float diff = horizontalVelocity.magnitude - runSpeed;
+					float diff = horizontalVelocity.magnitude - speed;
 					float sign = __instance.m_Input.y < -0.1f ? 1f : -1f;
 					horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity + __instance.directionDevice.forward.xz().normalized * diff * sign, Main.settings.maxAbhSpeed);
 				}
 			}
 
-			velocity.x = horizontalVelocity.x;
-			velocity.z = horizontalVelocity.y;
-			velocity.y = ___m_MoveDir.y;
 		}
 		else if (!__instance.underwater && Main.settings.walk)
 		{
-			Vector2 wishVeloc = ___m_MoveDir.xz();
+			float accel = Main.settings.ground_accelerate;
+			if (wishVeloc.magnitude > 0.1f)
+				accel *= (1f + 1f * (1f - Vector2.Dot(wishVeloc.normalized, horizontalVelocity.normalized)));
+			
+			float mag = horizontalVelocity.magnitude;
+			if (mag > speed)
+				accel *= mag / speed;
 
-			float accel = (wishVeloc.magnitude < 0.1f || (Vector2.Dot(wishVeloc.normalized, velocity.normalized) > 0f && wishVeloc.magnitude < velocity.magnitude))
-				? accel = Main.settings.ground_decelerate
-				: accel = Main.settings.ground_accelerate;
-
-			horizontalVelocity = Vector2.Lerp(horizontalVelocity, wishVeloc, Mathf.Clamp01(accel * Time.deltaTime));
-			horizontalVelocity = Vector2.MoveTowards(horizontalVelocity, wishVeloc, accel * Time.deltaTime * Main.settings.static_accel);
-
-			velocity.x = horizontalVelocity.x;
-			velocity.z = horizontalVelocity.y;
-			velocity.y = ___m_MoveDir.y;
+			horizontalVelocity = Vector2.MoveTowards(horizontalVelocity, wishVeloc, accel * Time.deltaTime);
 		}
 		else
 		{
+			updateVel = false;
 			velocity = ___m_MoveDir;
+		}
+
+		if (updateVel)
+		{
+			velocity = new Vector3(
+				horizontalVelocity.x,
+				___m_MoveDir.y,
+				horizontalVelocity.y
+			);
+
+			if (__instance.previouslyGrounded && !__instance.m_Jumping)
+			{
+				velocity.y -= ___m_StickToGroundForce;
+			}
+
 		}
 
 		previouslypreviouslyGrounded = previouslyGrounded;
@@ -255,15 +293,6 @@ static class CustomFirstPersonController_Patch
 		{
 			__instance.capsule.Move(velocity * Time.deltaTime);
 		}
-	}
-
-	[HarmonyPatch(nameof(CustomFirstPersonController.UpdateLocomotionValues)), HarmonyPostfix]
-	public static void UpdateLocomotionValues_Postfix(CustomFirstPersonController __instance, float walkMult, float runMult)
-	{
-		float mult = Main.settings.speedmult;
-
-		__instance.movementSpeedMultipiler *= mult;
-		__instance.runSpeedMultipiler *= mult;
 	}
 
 	[HarmonyPatch("Update"), HarmonyPrefix]
@@ -298,6 +327,25 @@ public static class CharacterReparenting_Patch
 		catch (Exception e)
 		{
 			Main.logger.LogException(e);
+		}
+	}
+}
+
+[HarmonyPatch(typeof(CameraSmoothing))]
+public static class CameraSmoothing_Patch
+{
+	[HarmonyPatch("UpdateCameraSmoothing"), HarmonyPostfix]
+	public static void UpdateCameraSmoothing_Postfix(
+		float ___bobWalkBaseDistance,
+		float ___bobRunBaseDistance,
+		CustomFirstPersonController ___fpc,
+		float ___bobTime,
+		float ___bobDuration,
+		ref float ___bobDistance
+	) {
+		if (___bobTime == ___bobDuration && Main.settings.walk)
+		{
+			___bobDistance = ___fpc.m_IsWalking ? ___bobWalkBaseDistance * Main.settings.walkSpeed : ___bobRunBaseDistance * Main.settings.runSpeed;
 		}
 	}
 }

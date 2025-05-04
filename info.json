@@ -1,6 +1,6 @@
 {
 	"Id": "movement_mod",
-	"Version": "1.0.0",
+	"Version": "0.1.0",
 	"DisplayName": "Movement Mod",
 	"Author": "sloast",
 	"EntryMethod": "movement_mod.Main.Load",
